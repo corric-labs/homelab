@@ -1,0 +1,15 @@
+rules:
+  - id: allow-tenant-game-port-example
+    action: allow
+    direction: wan_in
+    protocol: udp
+    source_cidrs:
+      - 198.51.100.0/24
+    destination_zone: tenant
+    destination_ip: 10.30.0.10
+    destination_ports:
+      - "2456"
+      - "2457"
+    owner: tenant-a
+    justification: Example game server exposure
+    expires_at: 2026-12-31T23:59:59Z

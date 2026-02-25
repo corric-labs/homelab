@@ -1,0 +1,8 @@
+tenants:
+  - id: tenant-a
+    display_name: Tenant A
+    max_vms: 3
+    max_vcpu: 8
+    max_ram_gb: 16
+    max_disk_gb: 300
+    max_public_ports: 5

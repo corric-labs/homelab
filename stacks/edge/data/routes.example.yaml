@@ -1,0 +1,5 @@
+routes:
+  - id: example-static-route
+    destination_cidr: 10.40.0.0/24
+    next_hop: 10.20.0.2
+    description: Example only

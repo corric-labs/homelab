@@ -1,0 +1,44 @@
+name: CI Validate
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Block unsafe tracked file types
+        shell: bash
+        run: |
+          set -euo pipefail
+          blocked='(\.tfstate$|\.tfstate\.|\.tfplan$|\.pem$|\.p12$|\.pfx$|(^|/)\.env($|\.[^/]+$)|age\.key$|\.agekey$)'
+          allow='(^|/)\.env\.example$'
+          if git ls-files | grep -E "$blocked" | grep -Ev "$allow"; then
+            echo "Blocked sensitive/generated file tracked in repo."
+            exit 1
+          fi
+
+      - name: Validate YAML syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet pyyaml
+          python3 - <<'PY'
+          import pathlib
+          import yaml
+
+          files = [p for p in pathlib.Path('.').rglob('*.yml')] + [p for p in pathlib.Path('.').rglob('*.yaml')]
+          for p in files:
+              if '.git/' in p.as_posix():
+                  continue
+              with p.open('r', encoding='utf-8') as f:
+                  yaml.safe_load(f)
+          print(f"Validated YAML files: {len(files)}")
+          PY

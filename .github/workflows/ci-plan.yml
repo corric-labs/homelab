@@ -1,0 +1,126 @@
+name: CI Plan
+
+on:
+  pull_request:
+    paths:
+      - 'stacks/**'
+      - 'platform/modules/**'
+      - '.github/workflows/ci-plan.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure SOPS age key
+        if: ${{ secrets.SOPS_AGE_KEY != '' }}
+        shell: bash
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.config/sops/age
+          printf '%s\n' "$SOPS_AGE_KEY" > ~/.config/sops/age/keys.txt
+          chmod 600 ~/.config/sops/age/keys.txt
+
+      - name: Decrypt encrypted secrets (if present)
+        if: ${{ secrets.SOPS_AGE_KEY != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$(git ls-files 'secrets/**' | grep -E '\.(enc\.ya?ml|sops\.ya?ml|enc\.json|enc\.env)$' || true)" ]; then
+            echo "No encrypted secret files detected; skipping decrypt check."
+            exit 0
+          fi
+          if ! command -v sops >/dev/null 2>&1; then
+            echo "sops is not installed on runner. Install sops to decrypt secrets during plan/apply."
+            exit 1
+          fi
+          for f in $(git ls-files 'secrets/**' | grep -E '\.(enc\.ya?ml|sops\.ya?ml|enc\.json|enc\.env)$'); do
+            sops --decrypt "$f" >/dev/null
+          done
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: latest
+
+      - name: Check formatting (if terraform files exist)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "$(git ls-files '*.tf')" ]; then
+            tofu fmt -check -recursive
+          else
+            echo "No .tf files yet; skipping tofu fmt."
+          fi
+
+      - name: Plan changed stacks
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.TF_STATE_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TF_STATE_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.TF_STATE_REGION }}
+          TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+          TF_STATE_ENDPOINT: ${{ secrets.TF_STATE_ENDPOINT }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for v in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION TF_STATE_BUCKET TF_STATE_ENDPOINT; do
+            if [ -z "${!v:-}" ]; then
+              echo "Missing secret: $v"
+              missing=1
+            fi
+          done
+          if [ "$missing" -eq 1 ]; then
+            echo "State backend secrets are not fully configured yet. Skipping plan step."
+            exit 0
+          fi
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            if git rev-parse HEAD~1 >/dev/null 2>&1; then
+              BASE_SHA="$(git rev-parse HEAD~1)"
+            else
+              BASE_SHA="$(git rev-parse HEAD)"
+            fi
+            HEAD_SHA="$(git rev-parse HEAD)"
+          fi
+          CHANGED="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+
+          for stack in edge core dmz tenants; do
+            STACK_DIR="stacks/$stack/tofu"
+            if ! echo "$CHANGED" | grep -qE "^stacks/$stack/|^platform/modules/"; then
+              continue
+            fi
+            if [ ! -d "$STACK_DIR" ]; then
+              echo "No $STACK_DIR yet; skipping."
+              continue
+            fi
+            if ! ls "$STACK_DIR"/*.tf >/dev/null 2>&1; then
+              echo "No terraform files in $STACK_DIR; skipping."
+              continue
+            fi
+            echo "Planning stack: $stack"
+            tofu -chdir="$STACK_DIR" init -input=false -no-color \
+              -backend-config="bucket=${TF_STATE_BUCKET}" \
+              -backend-config="key=${stack}/terraform.tfstate" \
+              -backend-config="region=${AWS_REGION}" \
+              -backend-config="endpoint=${TF_STATE_ENDPOINT}" \
+              -backend-config="skip_region_validation=true" \
+              -backend-config="skip_credentials_validation=true" \
+              -backend-config="skip_metadata_api_check=true" \
+              -backend-config="force_path_style=true"
+            tofu -chdir="$STACK_DIR" plan -input=false -no-color
+          done
