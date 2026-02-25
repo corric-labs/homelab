@@ -1,0 +1,8 @@
+port_forwards:
+  - id: tenant-a-game-udp-2456
+    external_port: 2456
+    internal_ip: 10.30.0.10
+    internal_port: 2456
+    protocol: udp
+    owner: tenant-a
+    expires_at: 2026-12-31T23:59:59Z

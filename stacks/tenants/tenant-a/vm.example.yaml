@@ -1,0 +1,11 @@
+tenant_id: tenant-a
+vm_name: tenant-a-ubuntu-01
+image: ubuntu-24-04
+cpu: 2
+ram_mb: 4096
+disk_gb: 40
+network_zone: tenant
+ssh:
+  password_auth: false
+  authorized_keys:
+    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexamplekey tenant-a@example

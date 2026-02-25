@@ -1,0 +1,35 @@
+# IaC state and plans
+*.tfstate
+*.tfstate.*
+*.tfplan
+terraform.tfstate
+terraform.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+
+# OpenTofu state and plans
+*.tofu.tfstate
+*.tofu.tfstate.*
+
+# Secrets and env files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+age.key
+*.agekey
+
+# Generated inventories/logs/artifacts
+artifacts/
+logs/
+*.log
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/

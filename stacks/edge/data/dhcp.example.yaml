@@ -1,0 +1,5 @@
+reservations:
+  - id: tenant-a-vm1
+    mac: "02:00:00:aa:00:01"
+    ip: 10.30.0.10
+    hostname: tenant-a-vm1

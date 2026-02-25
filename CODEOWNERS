@@ -1,0 +1,7 @@
+# Default owners
+* @corric-labs
+
+# High-risk paths
+stacks/edge/** @corric-labs
+policy/** @corric-labs
+.github/workflows/** @corric-labs

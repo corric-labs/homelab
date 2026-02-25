@@ -1,0 +1,7 @@
+networks:
+  - id: tenant-shared
+    name: Tenant Shared
+    vlan_id: 30
+    subnet_cidr: 10.30.0.0/24
+    purpose: corporate
+    zone: tenant

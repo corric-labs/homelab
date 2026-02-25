@@ -1,0 +1,10 @@
+tenant_id: tenant-a
+services:
+  - id: game-server-1
+    protocol: udp
+    port: 2456
+    source_cidrs:
+      - 0.0.0.0/0
+    owner: tenant-a
+    justification: Example game service
+    expires_at: 2026-12-31T23:59:59Z
